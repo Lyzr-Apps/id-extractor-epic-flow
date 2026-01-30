@@ -2,50 +2,190 @@
   "agent_name": "Document Extractor Agent",
   "agent_id": "697c7714d36f070193f5ae9f",
   "agent_purpose": "parser",
-  "description": "Extracts personal details from document images (IDs, utility bills, bank statements) with confidence scores for each field",
+  "description": "Extracts identity document data, performs cross-reference validation against application data, and routes documents based on validation results with real-time feedback",
   "response_schema": {
     "status": "string",
     "result": {
       "document_type": "string",
-      "extracted_fields": {},
+      "extracted_fields": {
+        "full_name": {
+          "value": "string",
+          "confidence": "number"
+        },
+        "address": {
+          "value": "string",
+          "confidence": "number"
+        },
+        "date_of_birth": {
+          "value": "string",
+          "confidence": "number"
+        },
+        "document_number": {
+          "value": "string",
+          "confidence": "number"
+        },
+        "expiration_date": {
+          "value": "string",
+          "confidence": "number"
+        }
+      },
+      "validation_results": {
+        "name_match": {
+          "status": "string",
+          "details": "string"
+        },
+        "address_match": {
+          "status": "string",
+          "details": "string"
+        },
+        "id_format_valid": {
+          "status": "string",
+          "details": "string"
+        },
+        "document_expired": {
+          "status": "string",
+          "expiration_date": "string"
+        }
+      },
+      "clarity_score": "number",
+      "real_time_feedback": [
+        "string"
+      ],
+      "routing_decision": "string",
+      "routing_details": "string",
       "image_quality_notes": "string",
       "extraction_summary": "string"
     },
-    "message": "string",
     "metadata": {
       "agent_name": "string",
       "timestamp": "string"
     }
   },
   "example_response": {
-    "status": "error",
+    "status": "success",
     "result": {
-      "document_type": "Unknown",
-      "extracted_fields": {},
-      "image_quality_notes": "Could not identify as a valid document or image quality too poor",
-      "extraction_summary": "No fields extracted"
+      "document_type": "Driver License",
+      "extracted_fields": {
+        "full_name": {
+          "value": "James Thompson",
+          "confidence": 97
+        },
+        "address": {
+          "value": "123 Main St Apt 4B Springfield IL 62701",
+          "confidence": 96
+        },
+        "date_of_birth": {
+          "value": "1985-03-15",
+          "confidence": 99
+        },
+        "document_number": {
+          "value": "T50018392",
+          "confidence": 95
+        },
+        "expiration_date": {
+          "value": "2027-06-30",
+          "confidence": 96
+        }
+      },
+      "validation_results": {
+        "name_match": {
+          "status": "PARTIAL",
+          "details": "Middle name present in application ('Michael') but not on ID. Last and first names match."
+        },
+        "address_match": {
+          "status": "PASS",
+          "details": "Address matches after normalization. Minor abbreviation differences (Street/St)."
+        },
+        "id_format_valid": {
+          "status": "PASS",
+          "details": "Illinois driver license format valid: 1 letter followed by 8 digits."
+        },
+        "document_expired": {
+          "status": "PASS",
+          "expiration_date": "2027-06-30"
+        }
+      },
+      "clarity_score": 92,
+      "real_time_feedback": [
+        "Document clarity score: 92%. Ready to submit.",
+        "Name mismatch detected. Your ID shows 'James Thompson' but application shows 'James Michael Thompson'. Confirm full legal name for verification.",
+        "Address matches your application.",
+        "Expiration date: 2027-06-30 - document valid.",
+        "Image quality excellent - all fields clearly readable"
+      ],
+      "routing_decision": "MINOR_ISSUES",
+      "routing_details": "Partial name match (missing middle name on ID) requires manual confirmation. All other validations passed. Please confirm if your full legal name matches application, or update your application to match your ID before resubmitting.",
+      "image_quality_notes": "Image is sharp, well-lit, and all text fields are legible. No significant glare or shadow detected.",
+      "extraction_summary": "All required fields extracted successfully with high confidence. No issues encountered with image quality or field recognition. Minor issue detected with name matching (middle name discrepancy)."
     },
-    "message": "Unable to process image - not a recognized document type or image quality insufficient",
     "metadata": {
       "agent_name": "Document Extractor Agent",
-      "timestamp": "2026-01-30T12:00:00Z"
+      "timestamp": "2024-06-12T14:28:00Z"
     }
   },
   "is_actual_tested": true,
-  "test_timestamp": "2026-01-30T09:17:52.823566",
+  "test_timestamp": "2026-01-30T10:11:39.797123",
   "test_message_used": "Parse this sample text for testing",
   "actual_test_response": {
-    "status": "error",
+    "status": "success",
     "result": {
-      "document_type": "Unknown",
-      "extracted_fields": {},
-      "image_quality_notes": "Could not identify as a valid document or image quality too poor",
-      "extraction_summary": "No fields extracted"
+      "document_type": "Driver License",
+      "extracted_fields": {
+        "full_name": {
+          "value": "James Thompson",
+          "confidence": 97
+        },
+        "address": {
+          "value": "123 Main St Apt 4B Springfield IL 62701",
+          "confidence": 96
+        },
+        "date_of_birth": {
+          "value": "1985-03-15",
+          "confidence": 99
+        },
+        "document_number": {
+          "value": "T50018392",
+          "confidence": 95
+        },
+        "expiration_date": {
+          "value": "2027-06-30",
+          "confidence": 96
+        }
+      },
+      "validation_results": {
+        "name_match": {
+          "status": "PARTIAL",
+          "details": "Middle name present in application ('Michael') but not on ID. Last and first names match."
+        },
+        "address_match": {
+          "status": "PASS",
+          "details": "Address matches after normalization. Minor abbreviation differences (Street/St)."
+        },
+        "id_format_valid": {
+          "status": "PASS",
+          "details": "Illinois driver license format valid: 1 letter followed by 8 digits."
+        },
+        "document_expired": {
+          "status": "PASS",
+          "expiration_date": "2027-06-30"
+        }
+      },
+      "clarity_score": 92,
+      "real_time_feedback": [
+        "Document clarity score: 92%. Ready to submit.",
+        "Name mismatch detected. Your ID shows 'James Thompson' but application shows 'James Michael Thompson'. Confirm full legal name for verification.",
+        "Address matches your application.",
+        "Expiration date: 2027-06-30 - document valid.",
+        "Image quality excellent - all fields clearly readable"
+      ],
+      "routing_decision": "MINOR_ISSUES",
+      "routing_details": "Partial name match (missing middle name on ID) requires manual confirmation. All other validations passed. Please confirm if your full legal name matches application, or update your application to match your ID before resubmitting.",
+      "image_quality_notes": "Image is sharp, well-lit, and all text fields are legible. No significant glare or shadow detected.",
+      "extraction_summary": "All required fields extracted successfully with high confidence. No issues encountered with image quality or field recognition. Minor issue detected with name matching (middle name discrepancy)."
     },
-    "message": "Unable to process image - not a recognized document type or image quality insufficient",
     "metadata": {
       "agent_name": "Document Extractor Agent",
-      "timestamp": "2026-01-30T12:00:00Z"
+      "timestamp": "2024-06-12T14:28:00Z"
     }
   },
   "test_passed": true

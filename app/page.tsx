@@ -4,11 +4,16 @@ import { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Upload, FileText, Loader2, CheckCircle2, XCircle, Copy, Download, RefreshCw, ImageIcon } from 'lucide-react'
+import {
+  Upload, FileText, Loader2, CheckCircle, XCircle, Copy, Download,
+  RefreshCw, ImageIcon, AlertTriangle, CheckCircle2, Edit
+} from 'lucide-react'
 import { callAIAgent, uploadFiles } from '@/lib/aiAgent'
 import type { NormalizedAgentResponse } from '@/lib/aiAgent'
 
@@ -25,15 +30,39 @@ interface ExtractedFields {
   [fieldName: string]: ExtractedFieldValue
 }
 
+interface ValidationResult {
+  status: "PASS" | "FAIL" | "PARTIAL"
+  details: string
+  expiration_date?: string
+}
+
+interface ValidationResults {
+  name_match: ValidationResult
+  address_match: ValidationResult
+  id_format_valid: ValidationResult
+  document_expired: ValidationResult
+}
+
 interface DocumentResult {
   document_type: string
   extracted_fields: ExtractedFields
+  validation_results: ValidationResults
+  clarity_score: number
+  real_time_feedback: string[]
+  routing_decision: "PASS" | "MINOR_ISSUES" | "MANUAL_REVIEW"
+  routing_details: string
   image_quality_notes: string
   extraction_summary: string
 }
 
 interface DocumentResponse extends NormalizedAgentResponse {
   result: DocumentResult
+}
+
+interface ApplicationFormData {
+  name: string
+  address: string
+  dateOfBirth: string
 }
 
 // Helper function to get confidence color
@@ -43,10 +72,113 @@ function getConfidenceColor(confidence: number): string {
   return 'text-red-600'
 }
 
-function getConfidenceBadgeVariant(confidence: number): "default" | "secondary" | "destructive" {
-  if (confidence > 85) return 'default'
-  if (confidence >= 60) return 'secondary'
-  return 'destructive'
+// Helper function to get clarity score color
+function getClarityScoreColor(score: number): string {
+  if (score >= 85) return 'bg-green-600'
+  if (score >= 60) return 'bg-yellow-600'
+  return 'bg-red-600'
+}
+
+// Helper function to get clarity score text color
+function getClarityScoreTextColor(score: number): string {
+  if (score >= 85) return 'text-green-600'
+  if (score >= 60) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+// Helper function to get routing decision styling
+function getRoutingDecisionStyle(decision: string): { bgColor: string; textColor: string; borderColor: string; icon: any } {
+  switch (decision) {
+    case 'PASS':
+      return {
+        bgColor: 'bg-green-50',
+        textColor: 'text-green-900',
+        borderColor: 'border-green-200',
+        icon: CheckCircle
+      }
+    case 'MINOR_ISSUES':
+      return {
+        bgColor: 'bg-yellow-50',
+        textColor: 'text-yellow-900',
+        borderColor: 'border-yellow-200',
+        icon: AlertTriangle
+      }
+    case 'MANUAL_REVIEW':
+      return {
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-900',
+        borderColor: 'border-red-200',
+        icon: XCircle
+      }
+    default:
+      return {
+        bgColor: 'bg-slate-50',
+        textColor: 'text-slate-900',
+        borderColor: 'border-slate-200',
+        icon: AlertTriangle
+      }
+  }
+}
+
+// Helper function to get validation status styling
+function getValidationStatusStyle(status: string): { icon: any; color: string } {
+  switch (status) {
+    case 'PASS':
+      return { icon: CheckCircle, color: 'text-green-600' }
+    case 'FAIL':
+      return { icon: XCircle, color: 'text-red-600' }
+    case 'PARTIAL':
+      return { icon: AlertTriangle, color: 'text-yellow-600' }
+    default:
+      return { icon: AlertTriangle, color: 'text-slate-600' }
+  }
+}
+
+// Helper function to get feedback alert styling
+function getFeedbackAlertStyle(feedback: string): { bgColor: string; borderColor: string; textColor: string } {
+  const lowerFeedback = feedback.toLowerCase()
+
+  // Success/pass patterns
+  if (lowerFeedback.includes('ready to submit') ||
+      lowerFeedback.includes('matches') ||
+      lowerFeedback.includes('valid') ||
+      lowerFeedback.includes('excellent')) {
+    return {
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      textColor: 'text-green-800'
+    }
+  }
+
+  // Warning patterns
+  if (lowerFeedback.includes('mismatch') ||
+      lowerFeedback.includes('confirm') ||
+      lowerFeedback.includes('please') ||
+      lowerFeedback.includes('barcode')) {
+    return {
+      bgColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-200',
+      textColor: 'text-yellow-800'
+    }
+  }
+
+  // Error patterns
+  if (lowerFeedback.includes('failed') ||
+      lowerFeedback.includes('error') ||
+      lowerFeedback.includes('expired')) {
+    return {
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
+      textColor: 'text-red-800'
+    }
+  }
+
+  // Default info
+  return {
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-800'
+  }
 }
 
 // Copy to clipboard utility (iframe-safe)
@@ -74,6 +206,14 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 export default function Home() {
+  // Application form data state
+  const [formData, setFormData] = useState<ApplicationFormData>({
+    name: 'James Michael Thompson',
+    address: '123 Main Street, Apt 4B, Springfield, IL 62701',
+    dateOfBirth: '1985-03-15'
+  })
+  const [isEditingForm, setIsEditingForm] = useState(false)
+
   const [file, setFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -142,7 +282,7 @@ export default function Home() {
     }
   }, [handleFileSelect])
 
-  // Extract document details
+  // Extract document details with cross-reference validation
   const handleExtract = async () => {
     if (!file) {
       setStatusMessage('Please upload a document first')
@@ -163,11 +303,21 @@ export default function Home() {
         return
       }
 
-      setStatusMessage('Analyzing document...')
+      setStatusMessage('Analyzing document and validating against application data...')
 
-      // Call agent with uploaded file
+      // Build message with application form data for cross-reference validation
+      const message = `Analyze this document and validate against application form data:
+
+Application Form Data:
+- Name: ${formData.name}
+- Address: ${formData.address}
+- Date of Birth: ${formData.dateOfBirth}
+
+Extract all details, perform cross-reference validation, calculate clarity score, and provide routing decision with real-time feedback.`
+
+      // Call agent with uploaded file and application data
       const result = await callAIAgent(
-        'Extract all personal details from this document with confidence scores',
+        message,
         AGENT_ID,
         { assets: uploadResult.asset_ids }
       )
@@ -227,16 +377,85 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">
-            Document Extraction
+            Document Validation System
           </h1>
           <p className="text-slate-600 text-lg">
-            Extract personal details from ID cards, utility bills, and bank statements
+            AI-powered document extraction with cross-reference validation and automated routing
           </p>
         </div>
+
+        {/* Application Form Data Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-slate-900">
+                  <FileText className="w-5 h-5" />
+                  Application Form Data
+                </CardTitle>
+                <CardDescription>
+                  This data will be used for cross-reference validation
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingForm(!isEditingForm)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                {isEditingForm ? 'Save' : 'Edit'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="name" className="text-slate-700">Full Name</Label>
+                {isEditingForm ? (
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-slate-900 font-medium">{formData.name}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="address" className="text-slate-700">Address</Label>
+                {isEditingForm ? (
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-slate-900 font-medium">{formData.address}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="dob" className="text-slate-700">Date of Birth</Label>
+                {isEditingForm ? (
+                  <Input
+                    id="dob"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-slate-900 font-medium">{formData.dateOfBirth}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Upload Panel */}
@@ -283,7 +502,7 @@ export default function Home() {
                       Drop your document here or click to browse
                     </p>
                     <p className="text-sm text-slate-500 mt-1">
-                      ID Cards • Utility Bills • Bank Statements
+                      Driver License • Passport • National ID
                     </p>
                   </div>
                 </div>
@@ -344,12 +563,12 @@ export default function Home() {
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Analyzing Document...
+                    Validating Document...
                   </>
                 ) : (
                   <>
                     <FileText className="w-5 h-5 mr-2" />
-                    Extract Details
+                    Validate Document
                   </>
                 )}
               </Button>
@@ -362,7 +581,7 @@ export default function Home() {
               <CardTitle className="flex items-center justify-between text-slate-900">
                 <span className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Extraction Results
+                  Validation Results
                 </span>
                 {response && (
                   <Button
@@ -390,30 +609,150 @@ export default function Home() {
               {!response ? (
                 <div className="text-center py-12 text-slate-500">
                   <FileText className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-                  <p>Upload and extract a document to see results</p>
+                  <p>Upload and validate a document to see results</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Status Indicator */}
-                  <div className="flex items-center gap-3">
-                    {response.status === 'success' ? (
-                      <>
-                        <CheckCircle2 className="w-6 h-6 text-green-600" />
-                        <div>
-                          <p className="font-medium text-green-900">Extraction Successful</p>
-                          <p className="text-sm text-green-700">{response.message}</p>
+                  {/* Clarity Score Display */}
+                  {response.result.clarity_score !== undefined && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-medium text-slate-700">Document Clarity Score</p>
+                        <span className={`text-2xl font-bold ${getClarityScoreTextColor(response.result.clarity_score)}`}>
+                          {response.result.clarity_score}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={response.result.clarity_score}
+                        className="h-3"
+                      />
+                      <div className="flex items-center justify-between mt-2 text-xs text-slate-600">
+                        <span>Low Quality</span>
+                        <span>High Quality</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-3 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                          <span className="text-slate-600">Excellent (≥85%)</span>
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-6 h-6 text-red-600" />
-                        <div>
-                          <p className="font-medium text-red-900">Extraction Failed</p>
-                          <p className="text-sm text-red-700">{response.message}</p>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
+                          <span className="text-slate-600">Fair (60-84%)</span>
                         </div>
-                      </>
-                    )}
-                  </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                          <span className="text-slate-600">Poor (&lt;60%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Routing Decision Card */}
+                  {response.result.routing_decision && (
+                    <div>
+                      {(() => {
+                        const style = getRoutingDecisionStyle(response.result.routing_decision)
+                        const Icon = style.icon
+                        return (
+                          <div className={`${style.bgColor} ${style.borderColor} border-2 rounded-lg p-5`}>
+                            <div className="flex items-start gap-3 mb-3">
+                              <Icon className={`w-6 h-6 ${style.textColor} mt-0.5`} />
+                              <div>
+                                <p className={`text-lg font-bold ${style.textColor} mb-1`}>
+                                  {response.result.routing_decision === 'PASS' && 'Document Validated - Auto-Approved'}
+                                  {response.result.routing_decision === 'MINOR_ISSUES' && 'Minor Issues Detected - Review Guidance'}
+                                  {response.result.routing_decision === 'MANUAL_REVIEW' && 'Flagged for Manual Compliance Review'}
+                                </p>
+                                <Badge
+                                  variant={
+                                    response.result.routing_decision === 'PASS' ? 'default' :
+                                    response.result.routing_decision === 'MINOR_ISSUES' ? 'secondary' :
+                                    'destructive'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {response.result.routing_decision.replace('_', ' ')}
+                                </Badge>
+                              </div>
+                            </div>
+                            {response.result.routing_details && (
+                              <p className={`text-sm ${style.textColor} ml-9`}>
+                                {response.result.routing_details}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Real-Time Feedback Panel */}
+                  {response.result.real_time_feedback && response.result.real_time_feedback.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 mb-3">Real-Time Feedback</p>
+                      <div className="space-y-2">
+                        {response.result.real_time_feedback.map((feedback, index) => {
+                          const style = getFeedbackAlertStyle(feedback)
+                          return (
+                            <div
+                              key={index}
+                              className={`${style.bgColor} ${style.borderColor} border rounded-lg p-3`}
+                            >
+                              <p className={`text-sm ${style.textColor}`}>{feedback}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Validation Results Grid */}
+                  {response.result.validation_results && (
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 mb-3">Validation Checks</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {Object.entries(response.result.validation_results).map(([key, validation]) => {
+                          const style = getValidationStatusStyle(validation.status)
+                          const Icon = style.icon
+                          return (
+                            <div
+                              key={key}
+                              className="bg-white border border-slate-200 rounded-lg p-3"
+                            >
+                              <div className="flex items-start gap-2 mb-2">
+                                <Icon className={`w-5 h-5 ${style.color} mt-0.5`} />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-slate-900 capitalize">
+                                    {key.replace(/_/g, ' ')}
+                                  </p>
+                                  <Badge
+                                    variant={
+                                      validation.status === 'PASS' ? 'default' :
+                                      validation.status === 'PARTIAL' ? 'secondary' :
+                                      'destructive'
+                                    }
+                                    className="text-xs mt-1"
+                                  >
+                                    {validation.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-600 ml-7">
+                                {validation.details}
+                              </p>
+                              {validation.expiration_date && (
+                                <p className="text-xs text-slate-500 ml-7 mt-1">
+                                  Expires: {validation.expiration_date}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <Separator />
 
@@ -426,9 +765,9 @@ export default function Home() {
                   </div>
 
                   {/* Extracted Fields Table */}
-                  {hasExtractedFields ? (
+                  {hasExtractedFields && (
                     <div>
-                      <p className="text-sm text-slate-600 mb-3">Extracted Information</p>
+                      <p className="text-sm font-semibold text-slate-900 mb-3">Extracted Information</p>
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
@@ -480,35 +819,13 @@ export default function Home() {
                           </TableBody>
                         </Table>
                       </div>
-
-                      {/* Confidence Legend */}
-                      <div className="flex items-center gap-4 mt-3 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                          <span className="text-slate-600">High (&gt;85%)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                          <span className="text-slate-600">Medium (60-85%)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                          <span className="text-slate-600">Low (&lt;60%)</span>
-                        </div>
-                      </div>
                     </div>
-                  ) : (
-                    <Alert>
-                      <AlertDescription className="text-slate-700">
-                        No fields were extracted from this document.
-                      </AlertDescription>
-                    </Alert>
                   )}
 
                   {/* Image Quality Notes */}
                   {response.result.image_quality_notes && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm font-medium text-blue-900 mb-1">Image Quality Notes</p>
+                      <p className="text-sm font-medium text-blue-900 mb-1">Image Quality Assessment</p>
                       <p className="text-sm text-blue-800">{response.result.image_quality_notes}</p>
                     </div>
                   )}
@@ -516,7 +833,7 @@ export default function Home() {
                   {/* Extraction Summary */}
                   {response.result.extraction_summary && (
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                      <p className="text-sm font-medium text-slate-900 mb-1">Summary</p>
+                      <p className="text-sm font-medium text-slate-900 mb-1">Extraction Summary</p>
                       <p className="text-sm text-slate-700">{response.result.extraction_summary}</p>
                     </div>
                   )}
