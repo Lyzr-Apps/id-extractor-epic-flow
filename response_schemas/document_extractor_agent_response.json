@@ -1,0 +1,52 @@
+{
+  "agent_name": "Document Extractor Agent",
+  "agent_id": "697c7714d36f070193f5ae9f",
+  "agent_purpose": "parser",
+  "description": "Extracts personal details from document images (IDs, utility bills, bank statements) with confidence scores for each field",
+  "response_schema": {
+    "status": "string",
+    "result": {
+      "document_type": "string",
+      "extracted_fields": {},
+      "image_quality_notes": "string",
+      "extraction_summary": "string"
+    },
+    "message": "string",
+    "metadata": {
+      "agent_name": "string",
+      "timestamp": "string"
+    }
+  },
+  "example_response": {
+    "status": "error",
+    "result": {
+      "document_type": "Unknown",
+      "extracted_fields": {},
+      "image_quality_notes": "Could not identify as a valid document or image quality too poor",
+      "extraction_summary": "No fields extracted"
+    },
+    "message": "Unable to process image - not a recognized document type or image quality insufficient",
+    "metadata": {
+      "agent_name": "Document Extractor Agent",
+      "timestamp": "2026-01-30T12:00:00Z"
+    }
+  },
+  "is_actual_tested": true,
+  "test_timestamp": "2026-01-30T09:17:52.823566",
+  "test_message_used": "Parse this sample text for testing",
+  "actual_test_response": {
+    "status": "error",
+    "result": {
+      "document_type": "Unknown",
+      "extracted_fields": {},
+      "image_quality_notes": "Could not identify as a valid document or image quality too poor",
+      "extraction_summary": "No fields extracted"
+    },
+    "message": "Unable to process image - not a recognized document type or image quality insufficient",
+    "metadata": {
+      "agent_name": "Document Extractor Agent",
+      "timestamp": "2026-01-30T12:00:00Z"
+    }
+  },
+  "test_passed": true
+}

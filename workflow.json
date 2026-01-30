@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "Document Upload",
+      "nodeCategory": "input",
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "document_extractor_agent",
+      "type": "Agent",
+      "label": "Document Extractor Agent",
+      "nodeCategory": "agent",
+      "data": {
+        "agent_id": "697c7714d36f070193f5ae9f",
+        "agent_name": "Document Extractor Agent",
+        "description": "Analyzes uploaded document images (IDs, utility bills, bank statements) using vision capabilities to extract personal details (name, address, DOB, document numbers) and provides confidence scores (0-100%) for each extracted field based on image clarity and text legibility",
+        "provider": "OpenAI",
+        "model": "gpt-4.1",
+        "temperature": 0.2,
+        "top_p": 1
+      },
+      "position": {
+        "x": 400,
+        "y": 200
+      }
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Extraction Results",
+      "nodeCategory": "end",
+      "position": {
+        "x": 700,
+        "y": 200
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_node",
+      "target": "document_extractor_agent",
+      "id": "edge_input_to_extractor"
+    },
+    {
+      "source": "document_extractor_agent",
+      "target": "output_node",
+      "id": "edge_extractor_to_output"
+    }
+  ]
+}
