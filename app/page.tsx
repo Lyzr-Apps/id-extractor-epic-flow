@@ -12,7 +12,8 @@ import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Upload, FileText, Loader2, CheckCircle, XCircle, Copy, Download,
-  RefreshCw, ImageIcon, AlertTriangle, CheckCircle2, Edit
+  RefreshCw, ImageIcon, AlertTriangle, CheckCircle2, Edit,
+  Shield, ShieldCheck, ShieldAlert
 } from 'lucide-react'
 import { callAIAgent, uploadFiles } from '@/lib/aiAgent'
 import type { NormalizedAgentResponse } from '@/lib/aiAgent'
@@ -34,6 +35,16 @@ interface ValidationResult {
   status: "PASS" | "FAIL" | "PARTIAL"
   details: string
   expiration_date?: string
+  confidence?: number
+  is_expired?: boolean
+}
+
+interface AIGeneratedCheck {
+  status: "PASS" | "FAIL"
+  is_ai_generated: boolean
+  confidence: number
+  details: string
+  indicators_found: string[]
 }
 
 interface ValidationResults {
@@ -41,6 +52,7 @@ interface ValidationResults {
   address_match: ValidationResult
   id_format_valid: ValidationResult
   document_expired: ValidationResult
+  ai_generated_check: AIGeneratedCheck
 }
 
 interface DocumentResult {
@@ -138,11 +150,13 @@ function getValidationStatusStyle(status: string): { icon: any; color: string } 
 function getFeedbackAlertStyle(feedback: string): { bgColor: string; borderColor: string; textColor: string } {
   const lowerFeedback = feedback.toLowerCase()
 
-  // Success/pass patterns
+  // Success/pass patterns - including AI authenticity verified
   if (lowerFeedback.includes('ready to submit') ||
       lowerFeedback.includes('matches') ||
       lowerFeedback.includes('valid') ||
-      lowerFeedback.includes('excellent')) {
+      lowerFeedback.includes('excellent') ||
+      lowerFeedback.includes('authenticity verified') ||
+      lowerFeedback.includes('genuine')) {
     return {
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
@@ -150,11 +164,13 @@ function getFeedbackAlertStyle(feedback: string): { bgColor: string; borderColor
     }
   }
 
-  // Warning patterns
+  // Warning patterns - including AI generation warnings
   if (lowerFeedback.includes('mismatch') ||
       lowerFeedback.includes('confirm') ||
       lowerFeedback.includes('please') ||
-      lowerFeedback.includes('barcode')) {
+      lowerFeedback.includes('barcode') ||
+      lowerFeedback.includes('manual review required') ||
+      lowerFeedback.includes('signs of')) {
     return {
       bgColor: 'bg-yellow-50',
       borderColor: 'border-yellow-200',
@@ -162,10 +178,12 @@ function getFeedbackAlertStyle(feedback: string): { bgColor: string; borderColor
     }
   }
 
-  // Error patterns
+  // Error patterns - including AI detection failures
   if (lowerFeedback.includes('failed') ||
       lowerFeedback.includes('error') ||
-      lowerFeedback.includes('expired')) {
+      lowerFeedback.includes('expired') ||
+      lowerFeedback.includes('ai generation indicators') ||
+      lowerFeedback.includes('digital manipulation')) {
     return {
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
@@ -179,6 +197,13 @@ function getFeedbackAlertStyle(feedback: string): { bgColor: string; borderColor
     borderColor: 'border-blue-200',
     textColor: 'text-blue-800'
   }
+}
+
+// Helper function to get AI confidence bar color
+function getAIConfidenceColor(confidence: number): string {
+  if (confidence >= 85) return 'bg-green-600'
+  if (confidence >= 60) return 'bg-yellow-600'
+  return 'bg-red-600'
 }
 
 // Copy to clipboard utility (iframe-safe)
@@ -647,32 +672,129 @@ Extract all details, perform cross-reference validation, calculate clarity score
                     </div>
                   )}
 
+                  {/* AI Authenticity Check Card */}
+                  {response.result.validation_results?.ai_generated_check && (
+                    <div
+                      className={`
+                        border-2 rounded-lg p-5 shadow-sm
+                        ${response.result.validation_results.ai_generated_check.status === 'PASS'
+                          ? 'bg-green-50 border-green-300'
+                          : 'bg-red-50 border-red-300'
+                        }
+                      `}
+                    >
+                      <div className="flex items-start gap-3 mb-4">
+                        {response.result.validation_results.ai_generated_check.status === 'PASS' ? (
+                          <ShieldCheck className="w-7 h-7 text-green-600 mt-0.5" />
+                        ) : (
+                          <ShieldAlert className="w-7 h-7 text-red-600 mt-0.5" />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-slate-900 mb-1">
+                            AI Authenticity Check
+                          </p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge
+                              variant={response.result.validation_results.ai_generated_check.status === 'PASS' ? 'default' : 'destructive'}
+                              className="text-sm font-semibold"
+                            >
+                              {response.result.validation_results.ai_generated_check.is_ai_generated ? 'AI GENERATED' : 'AUTHENTIC'}
+                            </Badge>
+                            <span className={`text-lg font-bold ${
+                              response.result.validation_results.ai_generated_check.status === 'PASS'
+                                ? 'text-green-700'
+                                : 'text-red-700'
+                            }`}>
+                              Confidence: {response.result.validation_results.ai_generated_check.confidence}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Confidence Progress Bar */}
+                      <div className="mb-4">
+                        <Progress
+                          value={response.result.validation_results.ai_generated_check.confidence}
+                          className={`h-3 ${getAIConfidenceColor(response.result.validation_results.ai_generated_check.confidence)}`}
+                        />
+                        <div className="flex items-center justify-between mt-1 text-xs text-slate-600">
+                          <span>Low Confidence</span>
+                          <span>High Confidence</span>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <p className={`text-sm mb-3 ${
+                        response.result.validation_results.ai_generated_check.status === 'PASS'
+                          ? 'text-green-800'
+                          : 'text-red-800'
+                      }`}>
+                        {response.result.validation_results.ai_generated_check.details}
+                      </p>
+
+                      {/* Indicators Found (if any) */}
+                      {response.result.validation_results.ai_generated_check.indicators_found &&
+                       response.result.validation_results.ai_generated_check.indicators_found.length > 0 && (
+                        <div className="bg-white/50 border border-red-200 rounded-lg p-3">
+                          <div className="flex items-start gap-2 mb-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                            <p className="text-sm font-semibold text-red-900">Indicators Detected:</p>
+                          </div>
+                          <ul className="space-y-1 ml-6">
+                            {response.result.validation_results.ai_generated_check.indicators_found.map((indicator, idx) => (
+                              <li key={idx} className="text-sm text-red-800 list-disc">
+                                {indicator}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Routing Decision Card */}
                   {response.result.routing_decision && (
                     <div>
                       {(() => {
                         const style = getRoutingDecisionStyle(response.result.routing_decision)
                         const Icon = style.icon
+                        const aiCheck = response.result.validation_results?.ai_generated_check
+                        const isAIRelatedIssue = aiCheck && aiCheck.status === 'FAIL'
+
                         return (
                           <div className={`${style.bgColor} ${style.borderColor} border-2 rounded-lg p-5`}>
                             <div className="flex items-start gap-3 mb-3">
                               <Icon className={`w-6 h-6 ${style.textColor} mt-0.5`} />
-                              <div>
+                              <div className="flex-1">
                                 <p className={`text-lg font-bold ${style.textColor} mb-1`}>
                                   {response.result.routing_decision === 'PASS' && 'Document Validated - Auto-Approved'}
                                   {response.result.routing_decision === 'MINOR_ISSUES' && 'Minor Issues Detected - Review Guidance'}
                                   {response.result.routing_decision === 'MANUAL_REVIEW' && 'Flagged for Manual Compliance Review'}
                                 </p>
-                                <Badge
-                                  variant={
-                                    response.result.routing_decision === 'PASS' ? 'default' :
-                                    response.result.routing_decision === 'MINOR_ISSUES' ? 'secondary' :
-                                    'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {response.result.routing_decision.replace('_', ' ')}
-                                </Badge>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge
+                                    variant={
+                                      response.result.routing_decision === 'PASS' ? 'default' :
+                                      response.result.routing_decision === 'MINOR_ISSUES' ? 'secondary' :
+                                      'destructive'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {response.result.routing_decision.replace('_', ' ')}
+                                  </Badge>
+                                  {isAIRelatedIssue && (
+                                    <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                                      <ShieldAlert className="w-3 h-3" />
+                                      AI Detection Alert
+                                    </Badge>
+                                  )}
+                                  {aiCheck && aiCheck.status === 'PASS' && response.result.routing_decision === 'PASS' && (
+                                    <Badge variant="default" className="text-xs flex items-center gap-1 bg-green-600">
+                                      <ShieldCheck className="w-3 h-3" />
+                                      AI Verified
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             {response.result.routing_details && (
@@ -714,6 +836,9 @@ Extract all details, perform cross-reference validation, calculate clarity score
                       <p className="text-sm font-semibold text-slate-900 mb-3">Validation Checks</p>
                       <div className="grid grid-cols-2 gap-3">
                         {Object.entries(response.result.validation_results).map(([key, validation]) => {
+                          // Skip ai_generated_check as it has its own prominent card above
+                          if (key === 'ai_generated_check') return null
+
                           const style = getValidationStatusStyle(validation.status)
                           const Icon = style.icon
                           return (
@@ -745,6 +870,11 @@ Extract all details, perform cross-reference validation, calculate clarity score
                               {validation.expiration_date && (
                                 <p className="text-xs text-slate-500 ml-7 mt-1">
                                   Expires: {validation.expiration_date}
+                                </p>
+                              )}
+                              {validation.confidence !== undefined && (
+                                <p className="text-xs text-slate-500 ml-7 mt-1">
+                                  Confidence: {validation.confidence}%
                                 </p>
                               )}
                             </div>

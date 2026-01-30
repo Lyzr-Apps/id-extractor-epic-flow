@@ -1,41 +1,31 @@
 {
   "agent_name": "Document Extractor Agent",
   "agent_id": "697c7714d36f070193f5ae9f",
-  "agent_purpose": "parser",
-  "description": "Extracts identity document data, performs cross-reference validation against application data, and routes documents based on validation results with real-time feedback",
+  "agent_purpose": "Document analysis with AI-generated image detection",
+  "description": "Extracts data from uploaded documents (driver's license, passport, etc.), validates against application form data, performs AI-generated image detection, and provides routing decision with real-time feedback",
   "response_schema": {
     "status": "string",
     "result": {
-      "document_type": "string",
-      "extracted_fields": {
-        "full_name": {
-          "value": "string",
-          "confidence": "number"
-        },
-        "address": {
-          "value": "string",
-          "confidence": "number"
-        },
-        "date_of_birth": {
-          "value": "string",
-          "confidence": "number"
-        },
-        "document_number": {
-          "value": "string",
-          "confidence": "number"
-        },
-        "expiration_date": {
-          "value": "string",
-          "confidence": "number"
-        }
+      "extracted_data": {
+        "document_type": "string",
+        "full_name": "string",
+        "date_of_birth": "string",
+        "document_number": "string",
+        "address": "string",
+        "expiry_date": "string",
+        "issue_date": "string",
+        "issuing_authority": "string",
+        "additional_fields": {}
       },
       "validation_results": {
         "name_match": {
           "status": "string",
+          "confidence": "number",
           "details": "string"
         },
         "address_match": {
           "status": "string",
+          "confidence": "number",
           "details": "string"
         },
         "id_format_valid": {
@@ -44,17 +34,24 @@
         },
         "document_expired": {
           "status": "string",
-          "expiration_date": "string"
+          "is_expired": "boolean",
+          "expiry_date": "string"
+        },
+        "ai_generated_check": {
+          "status": "string",
+          "is_ai_generated": "boolean",
+          "confidence": "number",
+          "details": "string",
+          "indicators_found": [
+            "any"
+          ]
         }
       },
-      "clarity_score": "number",
-      "real_time_feedback": [
-        "string"
-      ],
       "routing_decision": "string",
       "routing_details": "string",
-      "image_quality_notes": "string",
-      "extraction_summary": "string"
+      "real_time_feedback": [
+        "string"
+      ]
     },
     "metadata": {
       "agent_name": "string",
@@ -64,129 +61,120 @@
   "example_response": {
     "status": "success",
     "result": {
-      "document_type": "Driver License",
-      "extracted_fields": {
-        "full_name": {
-          "value": "James Thompson",
-          "confidence": 97
-        },
-        "address": {
-          "value": "123 Main St Apt 4B Springfield IL 62701",
-          "confidence": 96
-        },
-        "date_of_birth": {
-          "value": "1985-03-15",
-          "confidence": 99
-        },
-        "document_number": {
-          "value": "T50018392",
-          "confidence": 95
-        },
-        "expiration_date": {
-          "value": "2027-06-30",
-          "confidence": 96
-        }
+      "extracted_data": {
+        "document_type": "Driver's License",
+        "full_name": "John Michael Doe",
+        "date_of_birth": "1990-05-15",
+        "document_number": "DL123456789",
+        "address": "123 Main St, Springfield, IL 62701",
+        "expiry_date": "2028-12-31",
+        "issue_date": "2024-01-01",
+        "issuing_authority": "Illinois DMV",
+        "additional_fields": {}
       },
       "validation_results": {
         "name_match": {
-          "status": "PARTIAL",
-          "details": "Middle name present in application ('Michael') but not on ID. Last and first names match."
+          "status": "PASS",
+          "confidence": 99,
+          "details": "Exact match with customer name"
         },
         "address_match": {
           "status": "PASS",
-          "details": "Address matches after normalization. Minor abbreviation differences (Street/St)."
+          "confidence": 97,
+          "details": "Address matches billing address"
         },
         "id_format_valid": {
           "status": "PASS",
-          "details": "Illinois driver license format valid: 1 letter followed by 8 digits."
+          "details": "Valid Illinois driver's license format"
         },
         "document_expired": {
           "status": "PASS",
-          "expiration_date": "2027-06-30"
+          "is_expired": false,
+          "expiry_date": "2028-12-31"
+        },
+        "ai_generated_check": {
+          "status": "PASS",
+          "is_ai_generated": false,
+          "confidence": 94,
+          "details": "Document shows authentic paper texture, natural lighting, genuine security features. ID photo has realistic skin texture and natural facial characteristics.",
+          "indicators_found": []
         }
       },
-      "clarity_score": 92,
+      "routing_decision": "AUTO_APPROVE",
+      "routing_details": "All validation checks passed including AI detection. Document is authentic and matches customer data.",
       "real_time_feedback": [
-        "Document clarity score: 92%. Ready to submit.",
-        "Name mismatch detected. Your ID shows 'James Thompson' but application shows 'James Michael Thompson'. Confirm full legal name for verification.",
-        "Address matches your application.",
-        "Expiration date: 2027-06-30 - document valid.",
-        "Image quality excellent - all fields clearly readable"
-      ],
-      "routing_decision": "MINOR_ISSUES",
-      "routing_details": "Partial name match (missing middle name on ID) requires manual confirmation. All other validations passed. Please confirm if your full legal name matches application, or update your application to match your ID before resubmitting.",
-      "image_quality_notes": "Image is sharp, well-lit, and all text fields are legible. No significant glare or shadow detected.",
-      "extraction_summary": "All required fields extracted successfully with high confidence. No issues encountered with image quality or field recognition. Minor issue detected with name matching (middle name discrepancy)."
+        "Document type detected: Driver's License",
+        "Name validation: PASS (100% match)",
+        "Address validation: PASS (exact match)",
+        "Document expiry: Valid until 2028-12-31",
+        "Authenticity verified - document appears genuine (94% confidence)",
+        "Recommendation: AUTO_APPROVE"
+      ]
     },
     "metadata": {
       "agent_name": "Document Extractor Agent",
-      "timestamp": "2024-06-12T14:28:00Z"
+      "timestamp": "2026-01-30T10:00:00Z"
     }
   },
   "is_actual_tested": true,
-  "test_timestamp": "2026-01-30T10:11:39.797123",
-  "test_message_used": "Parse this sample text for testing",
+  "test_timestamp": "2026-01-30T10:41:02.437324",
+  "test_message_used": "Hello, provide a sample response",
   "actual_test_response": {
     "status": "success",
     "result": {
-      "document_type": "Driver License",
-      "extracted_fields": {
-        "full_name": {
-          "value": "James Thompson",
-          "confidence": 97
-        },
-        "address": {
-          "value": "123 Main St Apt 4B Springfield IL 62701",
-          "confidence": 96
-        },
-        "date_of_birth": {
-          "value": "1985-03-15",
-          "confidence": 99
-        },
-        "document_number": {
-          "value": "T50018392",
-          "confidence": 95
-        },
-        "expiration_date": {
-          "value": "2027-06-30",
-          "confidence": 96
-        }
+      "extracted_data": {
+        "document_type": "Driver's License",
+        "full_name": "John Michael Doe",
+        "date_of_birth": "1990-05-15",
+        "document_number": "DL123456789",
+        "address": "123 Main St, Springfield, IL 62701",
+        "expiry_date": "2028-12-31",
+        "issue_date": "2024-01-01",
+        "issuing_authority": "Illinois DMV",
+        "additional_fields": {}
       },
       "validation_results": {
         "name_match": {
-          "status": "PARTIAL",
-          "details": "Middle name present in application ('Michael') but not on ID. Last and first names match."
+          "status": "PASS",
+          "confidence": 99,
+          "details": "Exact match with customer name"
         },
         "address_match": {
           "status": "PASS",
-          "details": "Address matches after normalization. Minor abbreviation differences (Street/St)."
+          "confidence": 97,
+          "details": "Address matches billing address"
         },
         "id_format_valid": {
           "status": "PASS",
-          "details": "Illinois driver license format valid: 1 letter followed by 8 digits."
+          "details": "Valid Illinois driver's license format"
         },
         "document_expired": {
           "status": "PASS",
-          "expiration_date": "2027-06-30"
+          "is_expired": false,
+          "expiry_date": "2028-12-31"
+        },
+        "ai_generated_check": {
+          "status": "PASS",
+          "is_ai_generated": false,
+          "confidence": 94,
+          "details": "Document shows authentic paper texture, natural lighting, genuine security features. ID photo has realistic skin texture and natural facial characteristics.",
+          "indicators_found": []
         }
       },
-      "clarity_score": 92,
+      "routing_decision": "AUTO_APPROVE",
+      "routing_details": "All validation checks passed including AI detection. Document is authentic and matches customer data.",
       "real_time_feedback": [
-        "Document clarity score: 92%. Ready to submit.",
-        "Name mismatch detected. Your ID shows 'James Thompson' but application shows 'James Michael Thompson'. Confirm full legal name for verification.",
-        "Address matches your application.",
-        "Expiration date: 2027-06-30 - document valid.",
-        "Image quality excellent - all fields clearly readable"
-      ],
-      "routing_decision": "MINOR_ISSUES",
-      "routing_details": "Partial name match (missing middle name on ID) requires manual confirmation. All other validations passed. Please confirm if your full legal name matches application, or update your application to match your ID before resubmitting.",
-      "image_quality_notes": "Image is sharp, well-lit, and all text fields are legible. No significant glare or shadow detected.",
-      "extraction_summary": "All required fields extracted successfully with high confidence. No issues encountered with image quality or field recognition. Minor issue detected with name matching (middle name discrepancy)."
+        "Document type detected: Driver's License",
+        "Name validation: PASS (100% match)",
+        "Address validation: PASS (exact match)",
+        "Document expiry: Valid until 2028-12-31",
+        "Authenticity verified - document appears genuine (94% confidence)",
+        "Recommendation: AUTO_APPROVE"
+      ]
     },
     "metadata": {
       "agent_name": "Document Extractor Agent",
-      "timestamp": "2024-06-12T14:28:00Z"
+      "timestamp": "2026-01-30T10:00:00Z"
     }
-  },
-  "test_passed": true
+  }
 }
